@@ -62,9 +62,9 @@ cd ../code/gait_estimation/
 
 #csv_output='/opt2/data/datasets/UCA-GAIT/gait_parameters_estimation.csv'
 
-python gait_parameters_estimation.py --pose_path $pose_path \
+python gait_parameters_estimation.py --pose_path $pose_file \
     --sensors_path $sensors_path \
-    --segmentation_path $segmentation_path \
+    --segmentation_path $semantic_segmentation_path \
     --scale $scale \
     --csv_output $output_path \
     --fps $fps
