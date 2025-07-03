@@ -93,11 +93,11 @@ The dataset is hosted in the following [Zenodo repository](https://zenodo.org/re
 
 ### Install dependencies
 
-The first is to create a Python environment from the **requirement.txt** file. The use of [**conda**](https://docs.anaconda.com/free/miniconda/miniconda-install/) is recommended.
+The first is to create a Python environment from the **requirements.txt** file. The use of [**conda**](https://docs.anaconda.com/free/miniconda/miniconda-install/) is recommended.
 
 
 ```
-conda create --name <env> --file requirement.txt
+conda create --name <env> --file requirements.txt
 conda activate <env>
 ```
 
@@ -346,7 +346,7 @@ python code/train/train_random_forest_regression.py \
   --gait_parameters <gait_parameters_csv> \
   --patients_measures <patients_measures_csv> \
   --partitions_path partitions/Age \
-  --features stride_length cadence \
+  --features Stride_UGS Cadence_UGS \
   --evaluation_path <output_dir>
 ```
 
