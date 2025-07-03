@@ -13,10 +13,11 @@ import argparse
 import joblib
 from pathlib import Path
 import sys
+import cv2
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "code"))
 
-from code.gait_estimation.gait_parameters_estimation import calculate_parameters
+from gait_estimation.gait_parameters_estimation import calculate_parameters
 
 
 def main() -> None:
@@ -25,18 +26,23 @@ def main() -> None:
     )
     parser.add_argument(
         "--pose_path",
-        required=True,
         help="directory containing AlphaPose JSON files",
     )
     parser.add_argument(
         "--sensors",
-        required=True,
         help="directory with OptoGait sensor bounding boxes",
     )
     parser.add_argument(
         "--segmentation_path",
-        required=True,
         help="directory containing DensePose segmentations",
+    )
+    parser.add_argument(
+        "--video",
+        help="path to a dataset video. If given, pose, sensor and segmentation paths are inferred",
+    )
+    parser.add_argument(
+        "--dataset_root",
+        help="root directory of the dataset (defaults to the video parent)",
     )
     parser.add_argument(
         "--age_model",
@@ -50,9 +56,29 @@ def main() -> None:
         "--scale", type=float, default=4.2, help="scene scale used for gait estimation"
     )
     parser.add_argument(
-        "--fps", type=float, default=29.97, help="video frame rate used to compute parameters"
+        "--fps", type=float, help="video frame rate used to compute parameters"
     )
     args = parser.parse_args()
+
+    if args.video:
+        video_path = Path(args.video).resolve()
+        dataset_root = Path(args.dataset_root).resolve() if args.dataset_root else video_path.parents[2]
+        patient = video_path.parents[1].name
+        gait_type = video_path.parent.name
+
+        if args.pose_path is None:
+            args.pose_path = str(dataset_root / "pose" / patient / gait_type)
+        if args.sensors is None:
+            args.sensors = str(dataset_root / "sensors_bboxes" / patient / gait_type)
+        if args.segmentation_path is None:
+            args.segmentation_path = str(dataset_root / "semantic_segmentation" / patient / gait_type)
+        if args.fps is None:
+            cap = cv2.VideoCapture(str(video_path))
+            args.fps = cap.get(cv2.CAP_PROP_FPS) or 29.97
+            cap.release()
+    else:
+        if args.fps is None:
+            args.fps = 29.97
 
     df = calculate_parameters(
         args.pose_path, args.sensors, args.segmentation_path, args.scale, args.fps
