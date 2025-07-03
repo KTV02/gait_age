@@ -93,11 +93,11 @@ The dataset is hosted in the following [Zenodo repository](https://zenodo.org/re
 
 ### Install dependencies
 
-The first is to create a Python environment from the **requirement.txt** file. The use of [**conda**](https://docs.anaconda.com/free/miniconda/miniconda-install/) is recommended.
+The first is to create a Python environment from the **requirements.txt** file. The use of [**conda**](https://docs.anaconda.com/free/miniconda/miniconda-install/) is recommended.
 
 
 ```
-conda create --name <env> --file requirement.txt
+conda create --name <env> --file requirements.txt
 conda activate <env>
 ```
 
