@@ -57,6 +57,7 @@ python create_partitions.py --validation_ratio $validation_ratio \
     --verbose
 
 
+
 # WEIGHT PARTITIONS
 
 variables="Sex BMI"
@@ -81,3 +82,4 @@ python create_partitions.py --validation_ratio $validation_ratio \
     --seed $seed \
     --variables $variables \
     --verbose
+
