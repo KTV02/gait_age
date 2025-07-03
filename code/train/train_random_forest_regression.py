@@ -4,6 +4,7 @@ import argparse
 import pathlib
 import numpy as np
 import pandas as pd
+import joblib
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
@@ -19,7 +20,10 @@ def parse_opt():
     parser.add_argument('--patients_measures', type=str, required=True, help='CSV with patient measures')
     parser.add_argument('--partitions_path', type=str, required=True, help='Directory with train/val/test partitions')
     parser.add_argument('--features', nargs='+', required=True, help='Features used for training')
-    parser.add_argument('--evaluation_path', type=str, required=True, help='Path to store evaluation results')
+    parser.add_argument('--evaluation_path', type=str, required=True,
+                        help='Path to store evaluation results')
+    parser.add_argument('--models_dir', type=str, default=None,
+                        help='Directory to store trained models')
     parser.add_argument('--n_estimators', type=int, default=100, help='Number of trees in the forest')
     parser.add_argument('--seed', type=int, default=27, help='Random seed')
     parser.add_argument('--target', type=str, default='Age',
@@ -124,7 +128,7 @@ def preprocess_data(data, task='age', scale_target=True):
     else:
         target_scaler = None
 
-    return data, target_scaler
+    return data, target_scaler, imp, scaler
 
 
 def evaluate_model_by_age_groups(y_true, y_pred, age_groups):
@@ -146,11 +150,14 @@ def main(args):
     GENDER_COL = args.gender_column
     TASK = args.task
     EVAL_PATH = args.evaluation_path
+    MODEL_DIR = args.models_dir
     SEED = args.seed
     N_EST = args.n_estimators
     N_DECIMALS = args.n_decimals
 
     pathlib.Path(EVAL_PATH).mkdir(parents=True, exist_ok=True)
+    if MODEL_DIR is not None:
+        pathlib.Path(MODEL_DIR).mkdir(parents=True, exist_ok=True)
     set_seed(SEED)
 
     if TASK == 'age':
@@ -171,8 +178,8 @@ def main(args):
         part_path = os.path.join(PARTITIONS_PATH, partition_file)
         data = get_data(GAIT_PATH, MEASURES_PATH, part_path, FEATURES,
                         TARGET, TASK, gender_col=GENDER_COL)
-        data, target_scaler = preprocess_data(data, task=TASK,
-                                             scale_target=(TASK in ['age', 'both']))
+        data, target_scaler, imp, scaler = preprocess_data(
+            data, task=TASK, scale_target=(TASK in ['age', 'both']))
 
         X_train = np.concatenate([data['train']['data'], data['val']['data']])
 
@@ -222,6 +229,22 @@ def main(args):
             results_age['partition_order'].append(partition_file)
             results_gender['partition_order'].append(partition_file)
 
+            if MODEL_DIR:
+                model_dict = {
+                    'age_model': age_model,
+                    'gender_model': gender_model,
+                    'imputer': imp,
+                    'scaler': scaler,
+                    'target_scaler': target_scaler,
+                }
+                joblib.dump(
+                    model_dict,
+                    os.path.join(
+                        MODEL_DIR,
+                        os.path.splitext(partition_file)[0] + '.joblib',
+                    ),
+                )
+
         elif TASK == 'age':
             y_train = np.concatenate([
                 data['train']['target'], data['val']['target']
@@ -251,6 +274,21 @@ def main(args):
 
             results['partition_order'].append(partition_file)
 
+            if MODEL_DIR:
+                model_dict = {
+                    'model': model,
+                    'imputer': imp,
+                    'scaler': scaler,
+                    'target_scaler': target_scaler,
+                }
+                joblib.dump(
+                    model_dict,
+                    os.path.join(
+                        MODEL_DIR,
+                        os.path.splitext(partition_file)[0] + '.joblib',
+                    ),
+                )
+
         else:  # gender
             y_train = np.concatenate([
                 data['train']['target'], data['val']['target']
@@ -266,6 +304,20 @@ def main(args):
             results['f1'].append(f1_score(y_true, y_preds))
 
             results['partition_order'].append(partition_file)
+
+            if MODEL_DIR:
+                model_dict = {
+                    'model': model,
+                    'imputer': imp,
+                    'scaler': scaler,
+                }
+                joblib.dump(
+                    model_dict,
+                    os.path.join(
+                        MODEL_DIR,
+                        os.path.splitext(partition_file)[0] + '.joblib',
+                    ),
+                )
 
     if TASK == 'age':
         results['mean_mse'] = round(np.mean(results['mse']), N_DECIMALS)
