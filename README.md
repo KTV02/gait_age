@@ -346,7 +346,7 @@ python code/train/train_random_forest_regression.py \
   --gait_parameters <gait_parameters_csv> \
   --patients_measures <patients_measures_csv> \
   --partitions_path partitions/Age \
-  --features stride_length cadence \
+  --features Stride_UGS Cadence_UGS \
   --evaluation_path <output_dir>
 ```
 
