@@ -336,7 +336,24 @@ verbose = 1)
 
 ```python
 y_preds = model.predict(test_ds)
-``` 
+```
+### Age and gender prediction with Random Forest
+
+A helper script can train a Random Forest for age regression, gender classification or both tasks simultaneously using the gait parameters.
+
+```bash
+python code/train/train_random_forest_regression.py \
+  --gait_parameters <gait_parameters_csv> \
+  --patients_measures <patients_measures_csv> \
+  --partitions_path partitions/Age \
+  --features stride_length cadence \
+  --evaluation_path <output_dir>
+```
+
+For gender classification, set `--task gender --target Sex --partitions_path partitions/Sex`.
+To predict both age and gender in one run, use `--task both --target Age --gender_column Sex`.
+
+The metrics (MSE/MAE for age, accuracy/F1 for gender) will be saved inside **--evaluation_path**. When running both tasks, separate JSON files for age and gender metrics will be produced.
 
 
 </details>
