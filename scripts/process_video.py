@@ -10,6 +10,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Prepare video data in the Health&Gait folder structure",
@@ -42,6 +43,7 @@ def parse_args() -> argparse.Namespace:
     )
     return parser.parse_args()
 
+
 # === Folder Setup ===
 def main() -> None:
     args = parse_args()
@@ -53,9 +55,11 @@ def main() -> None:
     output_base = Path(participant_id)
     modalities = ["pose", "semantic_segmentation", "optical_flow", "silhouette"]
     for modality in modalities:
-        (output_base / modality / condition / direction).mkdir(parents=True, exist_ok=True)
+        (output_base / modality / condition / direction).mkdir(
+            parents=True, exist_ok=True
+        )
 
-# === Extract frames ===
+    # === Extract frames ===
 
     frame_dir = "temp_frames"
     os.makedirs(frame_dir, exist_ok=True)
@@ -70,22 +74,26 @@ def main() -> None:
         frame_idx += 1
     cap.release()
 
-# === Run AlphaPose ===
-    subprocess.run([
-        "python",
-        str(Path(args.alphapose_dir) / "demo.py"),
-        "--indir",
-        frame_dir,
-        "--outdir",
-        "alphapose_temp",
-        "--detector",
-        "yolo3",
-        "--pose_model",
-        "resnet50",
-        "--save_img",
-        "False",
-    ], check=True)
-# Move JSONs
+    # === Run AlphaPose ===
+    subprocess.run(
+        [
+            "python",
+            "scripts/demo_inference.py",
+            "--indir",
+            frame_dir,
+            "--outdir",
+            "alphapose_temp",
+            "--detector",
+            "yolo3",
+            "--pose_model",
+            "resnet50",
+            "--save_img",
+            "False",
+        ],
+        check=True,
+        cwd=args.alphapose_dir,
+    )
+    # Move JSONs
     for f in os.listdir("alphapose_temp"):
         if f.endswith(".json"):
             shutil.move(
@@ -93,7 +101,7 @@ def main() -> None:
                 output_base / "pose" / condition / direction / f,
             )
 
-# === Run DensePose ===
+    # === Run DensePose ===
     os.makedirs("densepose_temp", exist_ok=True)
     for f in sorted(os.listdir(frame_dir)):
         input_img = os.path.join(frame_dir, f)
@@ -101,9 +109,13 @@ def main() -> None:
         subprocess.run(
             [
                 "python",
-                str(Path(args.densepose_dir) / "tools" / "infer_simple.py"),
+                "tools/infer_simple.py",
                 "--cfg",
-                str(Path(args.densepose_dir) / "configs" / "DensePose_ResNet101_FPN_s1x-e2e.yaml"),
+                str(
+                    Path(args.densepose_dir)
+                    / "configs"
+                    / "DensePose_ResNet101_FPN_s1x-e2e.yaml"
+                ),
                 "--output-dir",
                 "densepose_temp",
                 "--image-ext",
@@ -113,15 +125,20 @@ def main() -> None:
                 input_img,
             ],
             check=True,
+            cwd=args.densepose_dir,
         )
         moved = Path(output_img)
         if moved.exists():
             shutil.move(
                 str(moved),
-                output_base / "semantic_segmentation" / condition / direction / moved.name,
+                output_base
+                / "semantic_segmentation"
+                / condition
+                / direction
+                / moved.name,
             )
 
-# === Run Optical Flow (Dual TV-L1 using OpenCV) ===
+    # === Run Optical Flow (Dual TV-L1 using OpenCV) ===
     prev_frame = None
     for f in sorted(os.listdir(frame_dir)):
         current_frame = cv2.imread(os.path.join(frame_dir, f))
@@ -134,28 +151,42 @@ def main() -> None:
             hsv[..., 1] = 255
             hsv[..., 2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
             flow_rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-            out_path = output_base / "optical_flow" / condition / direction / f.replace(".jpg", "_flow.png")
+            out_path = (
+                output_base
+                / "optical_flow"
+                / condition
+                / direction
+                / f.replace(".jpg", "_flow.png")
+            )
             cv2.imwrite(str(out_path), flow_rgb)
         prev_frame = gray
 
-# === Run YOLOv8x-seg for Silhouette ===
+    # === Run YOLOv8x-seg for Silhouette ===
     yolo_script = Path("yolov8seg/apply_yolo_seg.py")
     if yolo_script.exists():
         for f in sorted(os.listdir(frame_dir)):
             input_img = os.path.join(frame_dir, f)
-            output_path = output_base / "silhouette" / condition / direction / f.replace(".jpg", "_silhouette.jpg")
-            subprocess.run([
-                "python",
-                str(yolo_script),
-                "--image",
-                input_img,
-                "--output",
-                str(output_path),
-            ])
+            output_path = (
+                output_base
+                / "silhouette"
+                / condition
+                / direction
+                / f.replace(".jpg", "_silhouette.jpg")
+            )
+            subprocess.run(
+                [
+                    "python",
+                    str(yolo_script),
+                    "--image",
+                    input_img,
+                    "--output",
+                    str(output_path),
+                ]
+            )
     else:
         print("⚠️ YOLOv8 segmentation script not found; skipping silhouettes")
 
-# === Clean Up ===
+    # === Clean Up ===
     shutil.rmtree("alphapose_temp", ignore_errors=True)
     shutil.rmtree("densepose_temp", ignore_errors=True)
     shutil.rmtree(frame_dir, ignore_errors=True)
