@@ -92,6 +92,7 @@ def main() -> None:
         ],
         check=True,
         cwd=args.alphapose_dir,
+        env=dict(os.environ, PYTHONPATH=args.alphapose_dir),
     )
     # Move JSONs
     for f in os.listdir("alphapose_temp"):
@@ -126,6 +127,7 @@ def main() -> None:
             ],
             check=True,
             cwd=args.densepose_dir,
+            env=dict(os.environ, PYTHONPATH=args.densepose_dir),
         )
         moved = Path(output_img)
         if moved.exists():
