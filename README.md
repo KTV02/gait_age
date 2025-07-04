@@ -99,8 +99,11 @@ The first is to create a Python environment from the **requirements.txt** file. 
 ```
 conda create --name <env> --file requirements.txt
 conda activate <env>
-bash setup_processing_tools.sh
+# run the helper with bash from the repository root
+bash scripts/setup_processing_tools.sh
 ```
+
+Make sure to execute the script with `bash`; running it with Python will result in a `SyntaxError`.
 
 Check if Tensorflow is installed correctly:
 

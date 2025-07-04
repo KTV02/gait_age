@@ -1,6 +1,6 @@
 #!/bin/bash
-
 # Clone required third-party tools for data processing
+# Run this script from the repository root using bash
 set -e
 
 if [ ! -d AlphaPose ]; then
