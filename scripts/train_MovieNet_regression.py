@@ -166,24 +166,29 @@ class FrameGenerator:
 
       yield video_frames, label
 
+
+
 def create_model(MODEL_ID, BATCH_SIZE, NUM_FRAMES, IMG_SIZE, LEARNING_RATE, UNITS):
     tf.keras.backend.clear_session()
 
+    # Load MoviNet once, outside of any Lambda or nested function
     movinet_url = f"https://tfhub.dev/tensorflow/movinet/{MODEL_ID}/base/kinetics-600/classification/3"
+    movinet_model = hub.load(movinet_url)
 
+    # Define input
     inputs = tf.keras.Input(shape=(NUM_FRAMES, IMG_SIZE, IMG_SIZE, 3), name="image")
 
-    def movinet_module(x):
-        hub_layer = hub.load(movinet_url)
-        return hub_layer({"image": x})  # Output: (None, 600)
+    # Use MoviNet directly
+    x = movinet_model({"image": inputs})  # Output shape: (None, 600)
 
-    x = tf.keras.layers.Lambda(movinet_module)(inputs)
-
+    # Add your regression head
     x = tf.keras.layers.Dense(UNITS, activation='relu')(x)
     outputs = tf.keras.layers.Dense(1, activation='linear')(x)
 
+    # Final model
     model = tf.keras.Model(inputs=inputs, outputs=outputs)
 
+    # Compile
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
         loss='mean_squared_error',
@@ -191,6 +196,7 @@ def create_model(MODEL_ID, BATCH_SIZE, NUM_FRAMES, IMG_SIZE, LEARNING_RATE, UNIT
     )
 
     return model
+
 
 
 def get_data(PARTITIONS_FILE, DATA_PATH, DATA_TYPE, DATA_CLASS, OPTICAL_FLOW_METHOD, PATIENTS_INFO, TARGET):
