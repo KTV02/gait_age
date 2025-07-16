@@ -367,8 +367,9 @@ def main(args):
 
 
     # Callbacks
-    os.makedirs(os.path.dirname(checkpoint_filepath), exist_ok=True)
+    
     checkpoint_filepath = os.path.join(SAVE_DIR, GROUP_NAME, run_name, "checkpoint", "model.weights.h5")
+    os.makedirs(os.path.dirname(checkpoint_filepath), exist_ok=True)
 
     pathlib.Path(checkpoint_filepath).mkdir(parents=True, exist_ok=True)
 
