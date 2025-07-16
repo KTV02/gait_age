@@ -367,13 +367,13 @@ def main(args):
 
 
     # Callbacks
-
-    checkpoint_filepath = os.path.join(SAVE_DIR, GROUP_NAME, run_name, "checkpoint")
+    os.makedirs(os.path.dirname(checkpoint_filepath), exist_ok=True)
+    checkpoint_filepath = os.path.join(SAVE_DIR, GROUP_NAME, run_name, "checkpoint", "model.weights.h5")
 
     pathlib.Path(checkpoint_filepath).mkdir(parents=True, exist_ok=True)
 
     model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath = os.path.join(checkpoint_filepath, "weights.h5"),
+        filepath = checkpoint_filepath,
         save_weights_only = True ,
         monitor = 'val_loss',
         mode = 'min',
