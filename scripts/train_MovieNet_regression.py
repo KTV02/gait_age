@@ -12,15 +12,17 @@ import tensorflow as tf
 
 #from wandb.keras import WandbCallback
 #deprecated =>fix:
-from wandb.integration.keras import WandbCallback
-
+#from wandb.integration.keras import WandbCallback
+#also deprecated => use wandb metric logger
+from wandb.integration.keras import WandbMetricsLogger, WandbModelCheckpoint
 
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 
 
-from official.projects.movinet.modeling import movinet
-from official.projects.movinet.modeling import movinet_model
+import tensorflow_hub as hub
+import tensorflow as tf
+
 
 
 def parse_opt():
@@ -165,41 +167,28 @@ class FrameGenerator:
       yield video_frames, label
 
 def create_model(MODEL_ID, BATCH_SIZE, NUM_FRAMES, IMG_SIZE, LEARNING_RATE, UNITS):
-
-
     tf.keras.backend.clear_session()
 
-    backbone = movinet.Movinet(model_id = MODEL_ID)
-    backbone.trainable = False
+    movinet_url = f"https://tfhub.dev/tensorflow/movinet/{MODEL_ID}/base/kinetics-600/classification/3"
 
-    # Set num_classes=600 to load the pre-trained weights from the original model
-    base_model = movinet_model.MovinetClassifier(backbone = backbone, num_classes=600)
-    base_model.build([None, None, None, None, 3])
+    inputs = tf.keras.Input(shape=(NUM_FRAMES, IMG_SIZE, IMG_SIZE, 3), name="image")
 
-    # Cargar los pesos del modelo
-    checkpoint_dir = f'/opt/data/jzafra/thesis/technical_validation/pretraining_movinet/movinet_{MODEL_ID}_base'
-    checkpoint_path = tf.train.latest_checkpoint(checkpoint_dir)
-    checkpoint = tf.train.Checkpoint(model=base_model)
-    status = checkpoint.restore(checkpoint_path)
-    status.assert_existing_objects_matched()
+    def movinet_module(x):
+        hub_layer = hub.load(movinet_url)
+        return hub_layer({"image": x})  # Output: (None, 600)
 
-    base_model = tf.keras.models.Model(inputs = base_model.input, outputs = base_model.get_layer('classifier_head').input)
+    x = tf.keras.layers.Lambda(movinet_module)(inputs)
 
+    x = tf.keras.layers.Dense(UNITS, activation='relu')(x)
+    outputs = tf.keras.layers.Dense(1, activation='linear')(x)
 
-    model = tf.keras.Sequential([
-       base_model,
-       tf.keras.layers.GlobalAveragePooling3D(),
-       tf.keras.layers.Dense(UNITS, activation = 'relu'),
-       tf.keras.layers.Dense(1, activation='sigmoid')
-    ])
+    model = tf.keras.Model(inputs=inputs, outputs=outputs)
 
-    #model = build_classifier(BATCH_SIZE, NUM_FRAMES, IMG_SIZE, backbone, NUM_CLASSES)
-
-    model.build([BATCH_SIZE, NUM_FRAMES, IMG_SIZE, IMG_SIZE, 3])
-
-    optimizer = tf.keras.optimizers.Adam(learning_rate = LEARNING_RATE)
-
-    model.compile(loss='mean_squared_error', optimizer=optimizer, metrics = ["mae", "mse"]) # hubber loss
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
+        loss='mean_squared_error',
+        metrics=['mae', 'mse']
+    )
 
     return model
 
@@ -374,7 +363,7 @@ def main(args):
     pathlib.Path(checkpoint_filepath).mkdir(parents=True, exist_ok=True)
 
     model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-    filepath = os.path.join(checkpoint_filepath, "checkpoint"),
+    filepath = os.path.join(checkpoint_filepath, "checkpoint.weights.h5"),
     save_weights_only = True,
     monitor = 'val_loss',
     mode = 'min',
@@ -383,7 +372,15 @@ def main(args):
 
     early_stopping_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience = 15)
 
-    callbacks_list = [model_checkpoint_callback, early_stopping_callback, WandbCallback(save_model=False, monitor='val_loss')]
+    #callbacks_list = [model_checkpoint_callback, early_stopping_callback, WandbCallback(save_model=False, monitor='val_loss')]
+    callbacks_list = [
+        model_checkpoint_callback,
+        early_stopping_callback,
+        WandbMetricsLogger(),
+        WandbModelCheckpoint(filepath=os.path.join(checkpoint_filepath, "wandb.weights.h5"))
+    ]
+
+
 
     results = model.fit(train_ds,
     validation_data = val_ds,
