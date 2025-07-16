@@ -369,8 +369,8 @@ def main(args):
     pathlib.Path(checkpoint_filepath).mkdir(parents=True, exist_ok=True)
 
     model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath = os.path.join(checkpoint_filepath, "best_model.keras"),
-        save_weights_only = False,  # Save full model
+        filepath = os.path.join(checkpoint_filepath, "weights.h5"),
+        save_weights_only = True ,
         monitor = 'val_loss',
         mode = 'min',
         save_best_only = True
@@ -400,10 +400,13 @@ def main(args):
 
 
     # Load the best saved .keras model
-    model = tf.keras.models.load_model(os.path.join(checkpoint_filepath, "best_model.keras"))
+    model = create_model(MODEL_ID, BATCH_SIZE, NUM_FRAMES, IMG_SIZE, LEARNING_RATE, UNITS)
+    model.load_weights(os.path.join(checkpoint_filepath, "weights.h5"))
 
-    # Optional: Save a final copy elsewhere if you want
-    model.save(os.path.join(SAVE_DIR, GROUP_NAME, run_name, "final_model.keras"))
+
+    # ✅ Instead just save weights again if needed
+    model.save_weights(os.path.join(SAVE_DIR, GROUP_NAME, run_name, "final_weights.h5"))
+
 
 
 
