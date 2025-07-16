@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+import argparse
+import os
+import sys
+import numpy as np
+import pandas as pd
+from types import SimpleNamespace
+from scripts import train_MovieNet_regression
+
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_absolute_error
+import joblib
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Multimodal MoviNet + AlphaPose training with boosting fusion")
+    parser.add_argument("--dataset", required=True, help="root folder containing modalities and AlphaPose CSVs")
+    parser.add_argument("--patients_info", required=True, help="CSV with participant metadata")
+    parser.add_argument("--partitions", default="partitions/Age/partition_0.json", help="JSON with splits")
+    parser.add_argument("--save_dir", default="results", help="output directory")
+    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--num_frames", type=int, default=20)
+    parser.add_argument("--model_id", default="a0")
+    parser.add_argument("--gpu", type=int, default=0)
+    return parser.parse_args()
+
+
+def run_movinet_for_modality(modality, args):
+    movinet_args = SimpleNamespace(
+        device=args.gpu,
+        epochs=args.epochs,
+        img_size=224,
+        model_id=args.model_id,
+        save_dir=os.path.join(args.save_dir, modality),
+        data_path=args.dataset,
+        data_type=modality,
+        num_frames=args.num_frames,
+        batch_size=args.batch_size,
+        units=512,
+        id_partition=0,
+        learning_rate=0.001,
+        patients_info=args.patients_info,
+        partitions_file=args.partitions,
+        data_class="both",
+        optical_flow_method=None,
+        id_experiment=f"{modality}_regression",
+        target="Age",
+        wandb_project="age_regression",
+        experiment_name=f"movinet_{modality}",
+        seed=27,
+    )
+    y_preds, y_true = train_MovieNet_regression.main(movinet_args)
+    return np.array(y_preds).reshape(-1, 1), np.array(y_true)
+
+
+def load_alphapose_features(dataset_path, partitions_file):
+    import json
+    with open(partitions_file) as f:
+        partitions = json.load(f)
+    train_ids = partitions["train"]
+    test_ids = partitions["test"]
+
+    def load_features(ids):
+        features, labels = [], []
+        for pid in ids:
+            csv_path = os.path.join(dataset_path, "alphapose_csv", f"{pid}.csv")
+            if not os.path.exists(csv_path):
+                continue
+            df = pd.read_csv(csv_path)
+            if df.empty:
+                continue
+            feat = df.mean().values  # simple aggregation
+            features.append(feat)
+            labels.append(int(pid.split("_")[0]))  # assumes age is encoded or can be joined externally
+        return np.array(features), np.array(labels)
+
+    return load_features(train_ids), load_features(test_ids)
+
+
+def main():
+    args = parse_args()
+    modality_preds = []
+    ground_truth = None
+
+    for modality in ["silhouette", "semantic_segmentation", "optical_flow"]:
+        modality_path = os.path.join(args.dataset, modality)
+        if os.path.isdir(modality_path):
+            print(f"Training MoviNet on: {modality}")
+            preds, y_true = run_movinet_for_modality(modality, args)
+            modality_preds.append(preds)
+            if ground_truth is None:
+                ground_truth = y_true
+
+    if os.path.isdir(os.path.join(args.dataset, "alphapose_csv")):
+        print("Training RandomForest on AlphaPose CSVs...")
+        (X_train, y_train), (X_test, y_test) = load_alphapose_features(args.dataset, args.partitions)
+        rf = RandomForestRegressor(n_estimators=100)
+        rf.fit(X_train, y_train)
+        rf_preds = rf.predict(X_test).reshape(-1, 1)
+        modality_preds.append(rf_preds)
+        if ground_truth is None:
+            ground_truth = y_test
+
+    X_fusion = np.hstack(modality_preds)
+    y_fusion = ground_truth[:len(X_fusion)]
+
+    print("Training final Gradient Boosting Regressor...")
+    X_train, X_val, y_train, y_val = train_test_split(X_fusion, y_fusion, test_size=0.2, random_state=42)
+    boost = GradientBoostingRegressor()
+    boost.fit(X_train, y_train)
+    y_pred = boost.predict(X_val)
+
+    print(f"Fusion MAE: {mean_absolute_error(y_val, y_pred):.3f}")
+    os.makedirs(args.save_dir, exist_ok=True)
+    joblib.dump(boost, os.path.join(args.save_dir, "fusion_model.joblib"))
+
+
+if __name__ == "__main__":
+    main()
