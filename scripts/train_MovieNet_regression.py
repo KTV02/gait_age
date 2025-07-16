@@ -363,11 +363,13 @@ def main(args):
     pathlib.Path(checkpoint_filepath).mkdir(parents=True, exist_ok=True)
 
     model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-    filepath = os.path.join(checkpoint_filepath, "checkpoint.weights.h5"),
-    save_weights_only = True,
-    monitor = 'val_loss',
-    mode = 'min',
-    save_best_only = True)
+        filepath = os.path.join(checkpoint_filepath, "best_model.keras"),
+        save_weights_only = False,  # Save full model
+        monitor = 'val_loss',
+        mode = 'min',
+        save_best_only = True
+    )
+
 
 
     early_stopping_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience = 15)
@@ -390,13 +392,12 @@ def main(args):
     verbose = 1)
 
 
-    model.load_weights(os.path.join(checkpoint_filepath, "checkpoint"))
+    # Load the best saved .keras model
+    model = tf.keras.models.load_model(os.path.join(checkpoint_filepath, "best_model.keras"))
 
-    model_filepath = os.path.join(SAVE_DIR, GROUP_NAME, run_name, "model")
+    # Optional: Save a final copy elsewhere if you want
+    model.save(os.path.join(SAVE_DIR, GROUP_NAME, run_name, "final_model.keras"))
 
-    pathlib.Path(model_filepath).mkdir(parents=True, exist_ok=True)
-
-    model.save(model_filepath)
 
 
     ############################################################################
