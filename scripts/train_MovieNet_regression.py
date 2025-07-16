@@ -326,7 +326,7 @@ def main(args):
                                                             }
     )
    
-
+Ã
 
     ############################################################################
     ############################# DATA GENERATORS ##############################
@@ -412,7 +412,7 @@ def main(args):
 
 
     # âœ… Instead just save weights again if needed
-    model.save_weights(os.path.join(SAVE_DIR, GROUP_NAME, run_name, "final_weights.h5"))
+    model.save_weights(os.path.join(SAVE_DIR, GROUP_NAME, run_name, "final.weights.h5"))
     # After training
     wandb.save(checkpoint_filepath)  # Upload model.weights.h5
 
