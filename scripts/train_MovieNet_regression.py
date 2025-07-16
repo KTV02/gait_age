@@ -167,28 +167,32 @@ class FrameGenerator:
       yield video_frames, label
 
 
+class MoviNetFeatureExtractor(tf.keras.layers.Layer):
+    def __init__(self, model_url):
+        super().__init__()
+        self.movinet = hub.load(model_url)
+
+    def call(self, inputs):
+        return self.movinet({"image": inputs})
 
 def create_model(MODEL_ID, BATCH_SIZE, NUM_FRAMES, IMG_SIZE, LEARNING_RATE, UNITS):
     tf.keras.backend.clear_session()
 
-    # Load MoviNet once, outside of any Lambda or nested function
+    # Load model URL
     movinet_url = f"https://tfhub.dev/tensorflow/movinet/{MODEL_ID}/base/kinetics-600/classification/3"
-    movinet_model = hub.load(movinet_url)
-
-    # Define input
+    
+    # Inputs
     inputs = tf.keras.Input(shape=(NUM_FRAMES, IMG_SIZE, IMG_SIZE, 3), name="image")
 
-    # Use MoviNet directly
-    x = movinet_model({"image": inputs})  # Output shape: (None, 600)
+    # Use wrapped TFHub model
+    x = MoviNetFeatureExtractor(movinet_url)(inputs)  # now works with symbolic input
 
-    # Add your regression head
+    # Add regression head
     x = tf.keras.layers.Dense(UNITS, activation='relu')(x)
     outputs = tf.keras.layers.Dense(1, activation='linear')(x)
 
-    # Final model
     model = tf.keras.Model(inputs=inputs, outputs=outputs)
 
-    # Compile
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
         loss='mean_squared_error',
