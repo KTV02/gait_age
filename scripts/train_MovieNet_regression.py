@@ -328,7 +328,7 @@ def main(args):
     train_ds = tf.data.Dataset.from_generator(FrameGenerator(data["train"]["path"], normalized_train, NUM_FRAMES, (IMG_SIZE, IMG_SIZE), training = True),
                 output_signature=output_signature)
 
-    train_ds = train_ds.batch(BATCH_SIZE)
+    train_ds = train_ds.repeat().batch(BATCH_SIZE)
 
     val_ds = tf.data.Dataset.from_generator(FrameGenerator(data["validation"]["path"], normalized_val, NUM_FRAMES, (IMG_SIZE, IMG_SIZE)),
                 output_signature=output_signature)
@@ -383,9 +383,10 @@ def main(args):
     ]
 
 
-
+    steps_per_epoch = len(data["train"]["path"]) // BATCH_SIZE
     results = model.fit(train_ds,
     validation_data = val_ds,
+    steps_per_epoch = steps_per_epoch,
     epochs = EPOCHS,
     validation_freq = 1,
     callbacks = callbacks_list,
