@@ -368,18 +368,21 @@ def main(args):
 
     # Callbacks
     
-    checkpoint_filepath = os.path.join(SAVE_DIR, GROUP_NAME, run_name, "checkpoint", "model.weights.h5")
-    os.makedirs(os.path.dirname(checkpoint_filepath), exist_ok=True)
+    checkpoint_dir = os.path.join(SAVE_DIR, GROUP_NAME, run_name, "checkpoint")
+    checkpoint_filepath = os.path.join(checkpoint_dir, "model.weights.h5")
 
-    pathlib.Path(checkpoint_filepath).mkdir(parents=True, exist_ok=True)
+    # Make sure only the directory part is created
+    os.makedirs(checkpoint_dir, exist_ok=True)
 
+    # Then use full path for ModelCheckpoint
     model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath = checkpoint_filepath,
-        save_weights_only = True ,
-        monitor = 'val_loss',
-        mode = 'min',
-        save_best_only = True
+        filepath=checkpoint_filepath,
+        save_weights_only=True,  # Note: ends in .weights.h5
+        monitor='val_loss',
+        mode='min',
+        save_best_only=True
     )
+
 
 
 
@@ -387,10 +390,9 @@ def main(args):
 
     #callbacks_list = [model_checkpoint_callback, early_stopping_callback, WandbCallback(save_model=False, monitor='val_loss')]
     callbacks_list = [
-        model_checkpoint_callback,
-        early_stopping_callback,
-        WandbMetricsLogger(),
-        WandbModelCheckpoint(filepath=os.path.join(checkpoint_filepath, "wandb.weights.h5"))
+        model_checkpoint_callback,             # Proper saving of best weights
+        early_stopping_callback,               # Stop if no improvement
+        WandbMetricsLogger(log_freq="epoch"),  # Logs metrics to wandb
     ]
 
 
@@ -406,11 +408,13 @@ def main(args):
 
     # Load the best saved .keras model
     model = create_model(MODEL_ID, BATCH_SIZE, NUM_FRAMES, IMG_SIZE, LEARNING_RATE, UNITS)
-    model.load_weights(os.path.join(checkpoint_filepath, "weights.h5"))
+    model.load_weights(checkpoint_filepath)
 
 
     # ✅ Instead just save weights again if needed
     model.save_weights(os.path.join(SAVE_DIR, GROUP_NAME, run_name, "final_weights.h5"))
+    # After training
+    wandb.save(checkpoint_filepath)  # Upload model.weights.h5
 
 
 
