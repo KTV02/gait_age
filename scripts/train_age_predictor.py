@@ -9,8 +9,12 @@ user only needs to supply the dataset path and CSV files.
 
 import argparse
 from types import SimpleNamespace
-
-from code.train import train_MoviNet_regression
+import os
+import sys
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(SCRIPT_DIR)
+#sys.path.append('/home/jonash/Dokumente/Lennart/predict/gait_age/')
+from scripts import train_MovieNet_regression
 
 
 def parse_args() -> argparse.Namespace:
@@ -84,7 +88,7 @@ def main() -> None:
         seed=27,
     )
 
-    train_MoviNet_regression.main(movinet_args)
+    train_MovieNet_regression.main(movinet_args)
 
 
 if __name__ == "__main__":
