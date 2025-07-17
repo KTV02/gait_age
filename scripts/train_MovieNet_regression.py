@@ -445,6 +445,7 @@ def main(args):
 
 
     wandb.finish()
+    return y_preds, y_trues
 
 
 
