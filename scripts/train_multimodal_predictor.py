@@ -87,6 +87,8 @@ def main():
         modality_path = os.path.join(args.dataset, modality)
         if os.path.isdir(modality_path):
             print(f"Training MoviNet on: {modality}")
+            if args.modality == 'optical_flow' and args.optical_flow_method is None:
+                args.optical_flow_method = 'gmflow'
             preds, y_true = run_movinet_for_modality(modality, args)
             modality_preds.append(preds)
             if ground_truth is None:
