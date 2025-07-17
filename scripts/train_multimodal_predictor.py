@@ -23,10 +23,12 @@ def parse_args():
     parser.add_argument("--num_frames", type=int, default=20)
     parser.add_argument("--model_id", default="a0")
     parser.add_argument("--gpu", type=int, default=0)
+    parser.add_argument("--optical_flow_method", type=str, help="Only used if modality is optical_flow")
     return parser.parse_args()
 
 
 def run_movinet_for_modality(modality, args):
+    optical_flow_method = args.optical_flow_method if modality == "optical_flow" else None
     movinet_args = SimpleNamespace(
         device=args.gpu,
         epochs=args.epochs,
@@ -43,7 +45,7 @@ def run_movinet_for_modality(modality, args):
         patients_info=args.patients_info,
         partitions_file=args.partitions,
         data_class="both",
-        optical_flow_method=None,
+        optical_flow_method=optical_flow_method,
         id_experiment=f"{modality}_regression",
         target="Age",
         wandb_project="age_regression",
@@ -82,17 +84,19 @@ def main():
     args = parse_args()
     modality_preds = []
     ground_truth = None
-
-    for modality in ["silhouette", "semantic_segmentation", "optical_flow"]:
+    #add this in the array below: "silhouette", "semantic_segmentation",
+    for modality in ["optical_flow"]:
         modality_path = os.path.join(args.dataset, modality)
         if os.path.isdir(modality_path):
             print(f"Training MoviNet on: {modality}")
             if modality == 'optical_flow' and args.optical_flow_method is None:
-                args.optical_flow_method = 'gmflow'
+                args.optical_flow_method = 'GMFLOW'
             preds, y_true = run_movinet_for_modality(modality, args)
             modality_preds.append(preds)
             if ground_truth is None:
                 ground_truth = y_true
+        else:
+            print(f"Skipping modality {modality}: folder not found at {modality_path}")
 
     if os.path.isdir(os.path.join(args.dataset, "alphapose_csv")):
         print("Training RandomForest on AlphaPose CSVs...")
