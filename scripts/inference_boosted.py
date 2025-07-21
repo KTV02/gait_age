@@ -143,6 +143,10 @@ def main():
         if len(preds) != fusion_model.n_features_in_:
             print(f"⚠️  Skipping {pid}: expected {fusion_model.n_features_in_} features, got {len(preds)}")
             continue
+        print(f"\n🧩 Patient: {pid}")
+        for i, value in enumerate(preds):
+            print(f"  Modality {i+1}: {value:.4f}")
+
         pred = fusion_model.predict([preds])[0]
         final_preds.append((pid, pred))
         pids.append(pid)
