@@ -110,7 +110,6 @@ def main():
     args = parse_args()
     modality_preds = []
     ground_truth = None
-    #add this in the array below: "silhouette", "semantic_segmentation",
     for modality in ["silhouette", "semantic_segmentation","optical_flow"]:
         modality_path = os.path.join(args.dataset, modality)
         if os.path.isdir(modality_path):
