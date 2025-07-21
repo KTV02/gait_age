@@ -394,6 +394,18 @@ def main(args):
     ]
 
 
+
+    print("📁 Collected training paths:")
+    for p in data["train"]["path"][:5]:
+        print("  -", p)
+
+    if not data["train"]["path"]:
+        print("🚨 No training files found. Check that DATA_PATH matches structure below:")
+        print("Expected:")
+        print("  /data/<modality>/<patient>/<gait_type>/<class_folder>/frames_or_files")
+        
+
+
     steps_per_epoch = len(data["train"]["path"]) // BATCH_SIZE
     results = model.fit(train_ds,
     validation_data = val_ds,
@@ -413,6 +425,14 @@ def main(args):
     model.save_weights(os.path.join(SAVE_DIR, GROUP_NAME, run_name, "final.weights.h5"))
     # After training
     wandb.save(checkpoint_filepath)  # Upload model.weights.h5
+
+    os.makedirs(os.path.join(SAVE_DIR, GROUP_NAME, run_name, "checkpoint"), exist_ok=True)
+
+    np.savez(
+        os.path.join(SAVE_DIR, GROUP_NAME, run_name, "checkpoint", "norm_params.npz"),
+        min_train=min_train,
+        max_train=max_train
+    )
 
 
 

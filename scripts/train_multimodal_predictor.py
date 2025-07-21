@@ -12,6 +12,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error
 import joblib
 
+import json
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Multimodal MoviNet + AlphaPose training with boosting fusion")
     parser.add_argument("--dataset", required=True, help="root folder containing modalities and AlphaPose CSVs")
@@ -55,26 +57,50 @@ def run_movinet_for_modality(modality, args):
     y_preds, y_true = train_MovieNet_regression.main(movinet_args)
     return np.array(y_preds).reshape(-1, 1), np.array(y_true)
 
-
 def load_alphapose_features(dataset_path, partitions_file):
-    import json
     with open(partitions_file) as f:
         partitions = json.load(f)
+
     train_ids = partitions["train"]
     test_ids = partitions["test"]
 
     def load_features(ids):
         features, labels = [], []
         for pid in ids:
-            csv_path = os.path.join(dataset_path, "alphapose_csv", f"{pid}.csv")
-            if not os.path.exists(csv_path):
+            json_path = os.path.join(dataset_path, "alphapose_csv", f"{pid}.csv")
+            if not os.path.exists(json_path):
                 continue
-            df = pd.read_csv(csv_path)
-            if df.empty:
+
+            try:
+                with open(json_path, "r") as f:
+                    data = json.load(f)
+            except json.JSONDecodeError:
+                print(f"⚠️  Skipping malformed file: {json_path}")
                 continue
-            feat = df.mean().values  # simple aggregation
+
+            joints_all = []
+            for frame in data:
+                joints = frame.get("joints")
+                if not joints:
+                    continue
+                coords = [(kp["x"], kp["y"]) for kp in joints.values() if kp]
+                if coords:
+                    joints_all.append([v for xy in coords for v in xy])  # flatten x, y
+
+            if not joints_all:
+                print(f"⚠️  No valid joints in: {json_path}")
+                continue
+
+            feat = np.mean(joints_all, axis=0)
             features.append(feat)
-            labels.append(int(pid.split("_")[0]))  # assumes age is encoded or can be joined externally
+
+            try:
+                age = int(pid.split("_")[0])  # assumes age is encoded in ID
+            except ValueError:
+                print(f"⚠️  Could not parse age from {pid}")
+                continue
+            labels.append(age)
+
         return np.array(features), np.array(labels)
 
     return load_features(train_ids), load_features(test_ids)
@@ -84,7 +110,6 @@ def main():
     args = parse_args()
     modality_preds = []
     ground_truth = None
-    #add this in the array below: "silhouette", "semantic_segmentation",
     for modality in ["silhouette", "semantic_segmentation","optical_flow"]:
         modality_path = os.path.join(args.dataset, modality)
         if os.path.isdir(modality_path):
