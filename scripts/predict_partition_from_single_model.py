@@ -66,7 +66,8 @@ def main():
     modality_path = os.path.join(args.data_dir, args.modality)
     weight_path = os.path.join(args.results_dir, args.modality, "checkpoint", "model.weights.h5")
     norm_path = os.path.join(args.results_dir, args.modality, "checkpoint", "norm_params.npz")
-
+    print(weight_path)
+    print(norm_path)
     if not (os.path.exists(weight_path) and os.path.exists(norm_path)):
         print(f"Missing model or normalization files for {args.modality}")
         return
