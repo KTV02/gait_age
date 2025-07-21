@@ -112,15 +112,27 @@ def main():
     for modality in ["silhouette", "semantic_segmentation", "optical_flow"]:
         modality_path = os.path.join(args.data_dir, modality)
         checkpoint_path = os.path.join(args.model_dir, modality, "checkpoint", "model.weights.h5")
+        norm_path = os.path.join(args.model_dir, modality, "checkpoint", "norm_params.npz")
 
-        if os.path.isdir(modality_path) and os.path.exists(checkpoint_path):
+        if os.path.isdir(modality_path) and os.path.exists(checkpoint_path) and os.path.exists(norm_path):
             print(f"→ Loading MoviNet model for {modality}")
             model = create_model(args.model_id, img_size=args.img_size, num_frames=args.num_frames)
             model.load_weights(checkpoint_path)
-            preds = predict_movinet(model, modality_path, num_frames=args.num_frames, img_size=args.img_size)
-            predictions_by_modality.append(preds)
+
+            # ⏬ Load normalization parameters
+            norm_data = np.load(norm_path)
+            min_train = norm_data["min_train"]
+            max_train = norm_data["max_train"]
+
+            raw_preds = predict_movinet(model, modality_path, num_frames=args.num_frames, img_size=args.img_size)
+
+            # 🧮 Denormalize each prediction
+            denorm_preds = [(pid, pred * (max_train - min_train) + min_train) for pid, pred in raw_preds]
+
+            predictions_by_modality.append(denorm_preds)
         else:
-            print(f"⚠️  Skipping modality '{modality}' (data or model missing)")
+            print(f"⚠️  Skipping modality '{modality}' (data, model, or norm_params missing)")
+
 
     alphapose_path = os.path.join(args.data_dir, "alphapose_csv")
     alphapose_model_path = os.path.join(args.model_dir, "alphapose_rf.joblib")
