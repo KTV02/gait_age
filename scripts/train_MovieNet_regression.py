@@ -414,6 +414,14 @@ def main(args):
     # After training
     wandb.save(checkpoint_filepath)  # Upload model.weights.h5
 
+    os.makedirs(os.path.join(SAVE_DIR, GROUP_NAME, run_name, "checkpoint"), exist_ok=True)
+    
+    np.savez(
+        os.path.join(SAVE_DIR, GROUP_NAME, run_name, "checkpoint", "norm_params.npz"),
+        min_train=min_train,
+        max_train=max_train
+    )
+
 
 
 
