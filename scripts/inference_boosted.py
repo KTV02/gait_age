@@ -152,13 +152,19 @@ def main():
 
             # ⏬ Load normalization parameters
             norm_data = np.load(norm_path)
-            min_train = norm_data["min_train"]
-            max_train = norm_data["max_train"]
+            min_train = norm_data["min_train"].item()
+            max_train = norm_data["max_train"].item()
 
-            raw_pred = predict_movinet(model, modality_path, num_frames=args.num_frames, img_size=args.img_size)
-            denorm_pred = raw_pred * (max_train - min_train) + min_train
-            predictions_by_modality.append([("Patient", denorm_pred)])
-            
+            # 🔄 Run prediction for all patient subfolders
+            raw_preds = predict_movinet(model, modality_path, num_frames=args.num_frames, img_size=args.img_size)
+
+            # 🧮 Denormalize each prediction
+            denorm_preds = [
+                (pid, float(pred) * (max_train - min_train) + min_train)
+                for pid, pred in raw_preds
+            ]
+
+            predictions_by_modality.append(denorm_preds)
         else:
             print(f"⚠️  Skipping modality '{modality}' (data, model, or norm_params missing)")
 
