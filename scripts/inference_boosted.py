@@ -44,20 +44,33 @@ def load_frames(path, num_frames=20, img_size=224):
     return tf.stack(frames)[..., ::-1].numpy()  # BGR → RGB
 
 
-def predict_movinet(model, input_dir, num_frames, img_size):
-    preds = []
-    for pid in sorted(os.listdir(input_dir)):
-        pid_path = os.path.join(input_dir, pid)
-        if not os.path.isdir(pid_path):
-            continue
-        try:
-            frames = load_frames(pid_path, num_frames=num_frames, img_size=img_size)
-            frames = np.expand_dims(frames, axis=0)
-            pred = model.predict(frames, verbose=0)[0][0]
-            preds.append((pid, pred))
-        except Exception as e:
-            print(f"Skipping {pid_path}: {e}")
-    return preds
+def predict_movinet(model, modality_path, num_frames, img_size):
+    """
+    Treat the entire folder as one patient sequence.
+    """
+    files = sorted([
+        f for f in os.listdir(modality_path)
+        if f.endswith(".png") or f.endswith(".jpg")
+    ])
+    if len(files) < num_frames:
+        raise ValueError(f"Not enough frames in {modality_path}")
+
+    step = len(files) // num_frames
+    selected = [files[i * step] for i in range(num_frames)]
+    frames = []
+    for f in selected:
+        img = cv2.imread(os.path.join(modality_path, f))
+        img = cv2.resize(img, (img_size, img_size))
+        img = tf.image.convert_image_dtype(img, tf.float32)
+        frames.append(img)
+    
+    # Stack and reshape to (1, T, H, W, C)
+    video = tf.stack(frames)[..., ::-1].numpy()  # BGR → RGB
+    video = np.expand_dims(video, axis=0)
+    
+    # Predict
+    pred = model.predict(video, verbose=0)[0][0]
+    return pred
 
 
 def predict_alphapose(alphapose_model, csv_dir):
@@ -124,12 +137,10 @@ def main():
             min_train = norm_data["min_train"]
             max_train = norm_data["max_train"]
 
-            raw_preds = predict_movinet(model, modality_path, num_frames=args.num_frames, img_size=args.img_size)
-
-            # 🧮 Denormalize each prediction
-            denorm_preds = [(pid, pred * (max_train - min_train) + min_train) for pid, pred in raw_preds]
-
-            predictions_by_modality.append(denorm_preds)
+            raw_pred = predict_movinet(model, modality_path, num_frames=args.num_frames, img_size=args.img_size)
+            denorm_pred = raw_pred * (max_train - min_train) + min_train
+            predictions_by_modality.append([("Patient", denorm_pred)])
+            
         else:
             print(f"⚠️  Skipping modality '{modality}' (data, model, or norm_params missing)")
 
