@@ -30,7 +30,7 @@ def create_model(model_id, img_size=224, num_frames=20, learning_rate=0.001, uni
     return model
 
 
-def load_frames(path, num_frames=20, img_size=224):
+def load_frames(path, num_frames=10, img_size=224):
     files = sorted([f for f in os.listdir(path) if f.endswith(".png") or f.endswith(".jpg")])
     total = len(files)
     if total < num_frames:
@@ -47,28 +47,36 @@ def load_frames(path, num_frames=20, img_size=224):
 def predict_movinet(model, modality_path, num_frames, img_size):
     """
     Treat the entire folder as one patient sequence.
+    If fewer frames than num_frames are available, repeat or interpolate them.
     """
     files = sorted([
         f for f in os.listdir(modality_path)
         if f.endswith(".png") or f.endswith(".jpg")
     ])
+
+    if not files:
+        raise ValueError(f"No image files found in {modality_path}")
+
+    # If less than num_frames, repeat images
     if len(files) < num_frames:
-        raise ValueError(f"Not enough frames in {modality_path}")
+        # Repeat the last image as needed
+        files = files + [files[-1]] * (num_frames - len(files))
 
     step = len(files) // num_frames
     selected = [files[i * step] for i in range(num_frames)]
+
     frames = []
     for f in selected:
         img = cv2.imread(os.path.join(modality_path, f))
+        if img is None:
+            raise ValueError(f"Failed to load image: {os.path.join(modality_path, f)}")
         img = cv2.resize(img, (img_size, img_size))
         img = tf.image.convert_image_dtype(img, tf.float32)
         frames.append(img)
-    
-    # Stack and reshape to (1, T, H, W, C)
+
     video = tf.stack(frames)[..., ::-1].numpy()  # BGR → RGB
     video = np.expand_dims(video, axis=0)
-    
-    # Predict
+
     pred = model.predict(video, verbose=0)[0][0]
     return pred
 
