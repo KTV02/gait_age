@@ -43,42 +43,52 @@ def load_frames(path, num_frames=10, img_size=224):
     frames = [tf.image.convert_image_dtype(f, tf.float32) for f in frames]
     return tf.stack(frames)[..., ::-1].numpy()  # BGR → RGB
 
-
-def predict_movinet(model, modality_path, num_frames, img_size):
+def predict_movinet(model, modality_dir, num_frames, img_size):
     """
-    Treat the entire folder as one patient sequence.
-    If fewer frames than num_frames are available, repeat or interpolate them.
+    Predict age for each patient (i.e., subdirectory under modality_dir)
     """
-    files = sorted([
-        f for f in os.listdir(modality_path)
-        if f.endswith(".png") or f.endswith(".jpg")
-    ])
+    preds = []
+    for patient_id in sorted(os.listdir(modality_dir)):
+        patient_path = os.path.join(modality_dir, patient_id)
+        if not os.path.isdir(patient_path):
+            continue
 
-    if not files:
-        raise ValueError(f"No image files found in {modality_path}")
+        files = sorted([
+            f for f in os.listdir(patient_path)
+            if f.endswith(".png") or f.endswith(".jpg")
+        ])
+        if not files:
+            print(f"⚠️  No images in {patient_path}")
+            continue
 
-    # If less than num_frames, repeat images
-    if len(files) < num_frames:
-        # Repeat the last image as needed
-        files = files + [files[-1]] * (num_frames - len(files))
+        # Handle cases with fewer images than required
+        if len(files) < num_frames:
+            files += [files[-1]] * (num_frames - len(files))
 
-    step = len(files) // num_frames
-    selected = [files[i * step] for i in range(num_frames)]
+        step = len(files) // num_frames
+        selected = [files[i * step] for i in range(num_frames)]
 
-    frames = []
-    for f in selected:
-        img = cv2.imread(os.path.join(modality_path, f))
-        if img is None:
-            raise ValueError(f"Failed to load image: {os.path.join(modality_path, f)}")
-        img = cv2.resize(img, (img_size, img_size))
-        img = tf.image.convert_image_dtype(img, tf.float32)
-        frames.append(img)
+        frames = []
+        for f in selected:
+            img = cv2.imread(os.path.join(patient_path, f))
+            if img is None:
+                print(f"⚠️  Could not read {f}")
+                continue
+            img = cv2.resize(img, (img_size, img_size))
+            img = tf.image.convert_image_dtype(img, tf.float32)
+            frames.append(img)
 
-    video = tf.stack(frames)[..., ::-1].numpy()  # BGR → RGB
-    video = np.expand_dims(video, axis=0)
+        if len(frames) != num_frames:
+            print(f"⚠️  Skipping {patient_id}, invalid frame count after loading.")
+            continue
 
-    pred = model.predict(video, verbose=0)[0][0]
-    return pred
+        video = tf.stack(frames)[..., ::-1].numpy()  # BGR → RGB
+        video = np.expand_dims(video, axis=0)
+
+        pred = model.predict(video, verbose=0)[0][0]
+        preds.append((patient_id, pred))
+    
+    return preds
 
 
 def predict_alphapose(alphapose_model, csv_dir):
